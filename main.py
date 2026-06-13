@@ -27,10 +27,38 @@ while cap.isOpened():
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = hands.process(frame_rgb)
 
+    
     if results.multi_hand_landmarks:
         for hand_landmarks in results.multi_hand_landmarks:
             mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
+    finger_count = 0
+    if results.multi_hand_landmarks:
+        for hand_landmarks, handedness in zip(results.multi_hand_landmarks, results.multi_handedness):
+            # MediaPipe flips labels, so we fetch the explicit label
+            hand_label = handedness.classification[0].label 
+            
+            tip_ids = [4, 8, 12, 16, 20]
+            for tip_id in tip_ids:
+                finger_tip = hand_landmarks.landmark[tip_id]
+                finger_ip = hand_landmarks.landmark[tip_id - 1]
+                finger_mcp = hand_landmarks.landmark[tip_id - 2]
+                if tip_id == 4:
+                    if hand_label == "Right":
+                        # Right thumb is open if tip X < knuckle X
+                        if finger_tip.x < finger_mcp.x:
+                            finger_count += 1
+                    else:
+                        # Left thumb is open if tip X > knuckle X
+                        if finger_tip.x > finger_mcp.x:
+                            finger_count += 1
+                else:
+                    # Other fingers remain the same (Y-axis based)
+                    if finger_tip.y < finger_mcp.y:
+                        finger_count += 1
+
+    cv2.putText(frame, str(finger_count), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+    
     cv2.imshow('Hand Landmarks', frame)
 
     # separated due to niri wm issues
